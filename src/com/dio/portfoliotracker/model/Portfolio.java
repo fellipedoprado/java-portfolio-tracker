@@ -1,5 +1,7 @@
 package com.dio.portfoliotracker.model;
 
+import com.dio.portfoliotracker.exception.InvalidPositionException;
+import com.dio.portfoliotracker.exception.PortfolioException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,22 +12,30 @@ public class Portfolio {
     List<Position> positions;
 
     public Portfolio(Customer owner, List<Position> positions) {
+        if (owner == null) {
+            throw new InvalidPositionException("Portfolio owner cannot be null");
+        }
         this.owner = owner;
-        this.positions = positions;
+        this.positions = positions != null ? positions : new ArrayList<>();
     }
 
     public boolean addPosition(Position position) {
-        if (position == null) {
-            return false;
+        try {
+            if (position == null) {
+                throw new InvalidPositionException("Position cannot be null");
+            }
+            if (positions == null) {
+                positions = new ArrayList<>();
+            }
+            if (positions.stream()
+                    .anyMatch(p -> p.getAsset().getTicker().equals(position.getAsset().getTicker()))) {
+                throw new InvalidPositionException("Position for asset " + position.getAsset().getTicker() + 
+                    " already exists in portfolio");
+            }
+            return positions.add(position);
+        } catch (Exception e) {
+            throw new PortfolioException("Error adding position to portfolio", e);
         }
-        if (positions == null) {
-            positions = new ArrayList<>();
-        }
-        if (positions.contains(position)) {
-            return false;
-        }
-        positions.add(position);
-        return true;
     }
 
     public boolean removePosition(Position position) {
@@ -37,28 +47,37 @@ public class Portfolio {
     }
 
     public BigDecimal calculateTotalValue() {
-        BigDecimal totalValue = BigDecimal.ZERO;
-        for (Position position : positions) {
-            totalValue = totalValue.add(position.calculateCurrentValue());
+        try {
+            return positions.stream()
+                .map(Position::calculateCurrentValue)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        } catch (Exception e) {
+            throw new PortfolioException("Error calculating total portfolio value", e);
         }
-        return totalValue;
     }
 
     public BigDecimal calculateTotalProfitLoss() {
-        BigDecimal totalProfitLoss = BigDecimal.ZERO;
-        for (Position position : positions) {
-            totalProfitLoss = totalProfitLoss.add(position.calculateProfitLoss());
+        try {
+            return positions.stream()
+                .map(Position::calculateProfitLoss)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        } catch (Exception e) {
+            throw new PortfolioException("Error calculating total portfolio profit/loss", e);
         }
-        return totalProfitLoss;
     }
 
     public void generateReport() {
-        System.out.println("Portfolio Report for " + owner.getName());
-        System.out.println("Total Value: " + calculateTotalValue());
-        System.out.println("Total Profit/Loss: " + calculateTotalProfitLoss());
-        System.out.println("Positions: ");
-        for (Position position : positions) {
-            System.out.println("- " + position.getAsset().getTicker() + ": " + position.calculateCurrentValue());
+        try {
+            System.out.println("Portfolio Report for " + owner.getName());
+            System.out.println("Total Value: " + calculateTotalValue());
+            System.out.println("Total Profit/Loss: " + calculateTotalProfitLoss());
+            System.out.println("Positions: ");
+            positions.forEach(position -> 
+                System.out.println("- " + position.getAsset().getTicker() + 
+                    ": " + position.calculateCurrentValue())
+            );
+        } catch (Exception e) {
+            throw new PortfolioException("Error generating portfolio report", e);
         }
     }
 
